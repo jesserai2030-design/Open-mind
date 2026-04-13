@@ -1,0 +1,8 @@
+{
+  "name": "ondeep AI",
+  "description": "An elegant, multi-functional AI application powered by Gemini. It features advanced capabilities including image generation and editing, web-grounded chat, complex reasoning with thinking mode, low-latency responses, and text-to-speech.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
