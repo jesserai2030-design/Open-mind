@@ -6,13 +6,12 @@ let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
   if (!aiInstance) {
-    const rawKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.API_KEY) : undefined);
-    
-    // Check if the key is valid (not empty and not the string "undefined" which can happen with Vite define)
-    const apiKey = rawKey && rawKey !== 'undefined' && rawKey !== 'null' ? rawKey : undefined;
+    // Follow skill guidelines: prioritize process.env.GEMINI_API_KEY
+    // The vite.config.ts 'define' handles mapping the env var to process.env
+    const apiKey = typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.API_KEY) : undefined;
 
     if (!apiKey) {
-      console.warn("API_KEY or GEMINI_API_KEY environment variable is not set. Please set VITE_GEMINI_API_KEY or GEMINI_API_KEY in your environment.");
+      console.warn("GEMINI_API_KEY environment variable is not set. Please ensure it is configured in your environment.");
     }
     
     aiInstance = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
@@ -104,84 +103,104 @@ export const runGemini = async ({
   const contents: Content[] = [...transformedHistory, finalUserContent];
 
   // Specialized modes override all other settings
-  if (specializedMode === 'plus') {
-      return await getAI().models.generateContent({
-          model: 'gemini-2.5-pro',
-          contents,
-          config: { 
-              systemInstruction: getPlusSystemInstruction(language),
-              thinkingConfig: { thinkingBudget: 32768 } 
-          },
-      });
-  }
+  try {
+      if (specializedMode === 'plus') {
+          return await getAI().models.generateContent({
+              model: 'gemini-3.1-pro-preview',
+              contents,
+              config: { 
+                  systemInstruction: getPlusSystemInstruction(language),
+                  thinkingConfig: { thinkingBudget: 32768 } 
+              },
+          });
+      }
 
-  if (specializedMode === 'teacher') {
-      return await getAI().models.generateContent({
-          model: 'gemini-2.5-pro',
-          contents,
-          config: { systemInstruction: teacherSystemInstruction, thinkingConfig: { thinkingBudget: 32768 } },
-      });
-  }
-  
-  if (specializedMode === 'notebook') {
-      return await getAI().models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents,
-          config: { systemInstruction: notebookSystemInstruction },
-      });
-  }
+      if (specializedMode === 'teacher') {
+          return await getAI().models.generateContent({
+              model: 'gemini-3.1-pro-preview',
+              contents,
+              config: { systemInstruction: teacherSystemInstruction, thinkingConfig: { thinkingBudget: 32768 } },
+          });
+      }
+      
+      if (specializedMode === 'notebook') {
+          return await getAI().models.generateContent({
+              model: 'gemini-3-flash-preview',
+              contents,
+              config: { systemInstruction: notebookSystemInstruction },
+          });
+      }
 
-  // If an image file is provided, it's already handled in `finalUserContent`.
-  if (imageFile) {
-      return await getAI().models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents,
-          config: { systemInstruction },
-      });
-  }
-  
-  // Image generation is not conversational and does not use history.
-  if (activeFeature === Feature.IMAGE_GENERATION || specializedMode === 'nanobanana') {
-      return await getAI().models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: prompt }] },
-          config: {
-              responseModalities: [Modality.IMAGE],
-              systemInstruction: imageGenerationSystemInstruction,
-          },
-      });
-  }
+      // If an image file is provided, it's already handled in `finalUserContent`.
+      if (imageFile) {
+          return await getAI().models.generateContent({
+              model: 'gemini-3-flash-preview',
+              contents,
+              config: { systemInstruction },
+          });
+      }
+      
+      // Image generation is not conversational and does not use history.
+      if (activeFeature === Feature.IMAGE_GENERATION || specializedMode === 'nanobanana') {
+          return await getAI().models.generateContent({
+              model: 'gemini-2.5-flash-image',
+              contents: { parts: [{ text: prompt }] },
+              config: {
+                  responseModalities: [Modality.IMAGE],
+                  systemInstruction: imageGenerationSystemInstruction,
+              },
+          });
+      }
 
-  // If no specific feature matches, it's a text-only chat.
-  if (powerMode === PowerMode.PRO2) {
-      // Ondeep Pro 2: Detailed, web-searched answers
-      return await getAI().models.generateContent({
-        model: 'gemini-2.5-pro',
-        contents,
-        config: { 
-            tools: [{ googleSearch: {} }],
-            systemInstruction,
-            thinkingConfig: { thinkingBudget: 32768 }
-        },
-      });
-  } else if (powerMode === PowerMode.SUPER) {
-      // Ondeep Super: Unlimited free models with web search
-      return await getAI().models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents,
-        config: { 
-            tools: [{ googleSearch: {} }],
-            systemInstruction,
-        },
-      });
-  } else {
-      // Ondeep Think: Quick, logical answers
-      return await getAI().models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents,
-        config: { 
-            systemInstruction: `${systemInstruction} ${thinkModeInstruction}` 
-        },
-      });
+      // If no specific feature matches, it's a text-only chat.
+      if (powerMode === PowerMode.PRO2) {
+          // Ondeep Pro 2: Detailed, web-searched answers
+          return await getAI().models.generateContent({
+            model: 'gemini-3.1-pro-preview',
+            contents,
+            config: { 
+                tools: [{ googleSearch: {} }],
+                systemInstruction,
+                thinkingConfig: { thinkingBudget: 32768 }
+            },
+          });
+      } else if (powerMode === PowerMode.SUPER) {
+          // Ondeep Super: Unlimited free models with web search
+          return await getAI().models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents,
+            config: { 
+                tools: [{ googleSearch: {} }],
+                systemInstruction,
+            },
+          });
+      } else {
+          // Ondeep Think: Quick, logical answers
+          return await getAI().models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents,
+            config: { 
+                systemInstruction: `${systemInstruction} ${thinkModeInstruction}` 
+            },
+          });
+      }
+  } catch (error: any) {
+      // Handle 503 Unavailable error by falling back to flash model if pro was used
+      if (error?.status === 'UNAVAILABLE' || (error?.message && error.message.includes('503'))) {
+          console.warn("Model unavailable (503), attempting fallback to flash model...");
+          
+          // Re-attempt using gemini-3-flash-preview
+          return await getAI().models.generateContent({
+              model: 'gemini-3-flash-preview',
+              contents,
+              config: { 
+                  systemInstruction: specializedMode === 'plus' ? getPlusSystemInstruction(language) : 
+                                   specializedMode === 'teacher' ? teacherSystemInstruction : 
+                                   systemInstruction,
+                  // Disable tools/thinking if fallback to ensure availability
+              },
+          });
+      }
+      throw error;
   }
 };
