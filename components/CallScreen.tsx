@@ -134,8 +134,9 @@ const CallScreen: React.FC<CallScreenProps> = ({ onClose, specializedMode }) => 
         }
 
         try {
-            if (!aiRef.current) {
-              aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+          if (!aiRef.current) {
+              const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || 'dummy-key';
+              aiRef.current = new GoogleGenAI({ apiKey });
             }
             
             streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });

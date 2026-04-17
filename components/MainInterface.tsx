@@ -113,12 +113,29 @@ const ChatMessage: React.FC<{ message: Message, onRegenerate: (message: Message)
                                 </div>
                             )}
                             {message.imageUrl && (
-                                <img 
-                                    src={message.imageUrl} 
-                                    alt="Generated content" 
-                                    className={`mt-2 rounded-lg max-w-xs cursor-pointer ${isUser ? 'border border-white/20' : ''}`}
-                                    onClick={() => setFullScreenImage(message.imageUrl || null)} 
-                                />
+                                <div className="relative inline-block group">
+                                    <img 
+                                        src={message.imageUrl} 
+                                        alt="Generated content" 
+                                        className={`mt-2 rounded-lg max-w-xs cursor-pointer ${isUser ? 'border border-white/20' : ''}`}
+                                        onClick={() => setFullScreenImage(message.imageUrl || null)} 
+                                    />
+                                    {!isUser && (
+                                       <button 
+                                           onClick={(e) => {
+                                              e.stopPropagation();
+                                              const a = document.createElement('a'); 
+                                              a.href = message.imageUrl!; 
+                                              a.download = 'image.png'; 
+                                              a.click();
+                                           }}
+                                           className="absolute top-4 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                           title={t('downloadImageInline' as any)}
+                                       >
+                                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                       </button>
+                                    )}
+                                </div>
                             )}
                             {message.sources && message.sources.length > 0 && (
                                 <div className={`mt-3 pt-2 border-t ${settings.theme === 'light' ? 'border-gray-300/50' : 'border-gray-500/30'}`}>
@@ -219,7 +236,7 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
     const handleResponse = (response: GenerateContentResponse, aiMessageId: string) => {
       const newAiMessage: Message = { id: aiMessageId, sender: MessageSender.AI };
 
-      if (settings.activeFeature === Feature.IMAGE_GENERATION && !imageFile) {
+      if ((settings.activeFeature === Feature.IMAGE_GENERATION || settings.specializedMode === 'nanobanana') && !imageFile) {
           const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
           if (imagePart?.inlineData) {
               newAiMessage.imageUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
@@ -336,6 +353,8 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
 
     const activeModeId = useMemo(() => {
       if (settings.specializedMode === 'plus') return 'plus';
+      if (settings.specializedMode === 'notebook') return 'notebook';
+      if (settings.specializedMode === 'nanobanana') return 'nanobanana';
       // teacher mode is not in the quick selector
       return settings.powerMode;
     }, [settings.specializedMode, settings.powerMode]);
@@ -345,32 +364,40 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
     const modeOptions = [
       { id: PowerMode.THINK, labelKey: 'powerModeThink', descKey: 'powerModeThinkDesc', powerMode: PowerMode.THINK, specializedMode: 'none' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2c-1.12 0-2.26.34-3.25 1-1.29.89-2.25 2.43-2.25 4.5 0 2.27 1.13 3.68 2.5 4.5 1.12.67 2.33 1 3.5 1h1c1.17 0 2.38-.33 3.5-1 1.37-.82 2.5-2.23 2.5-4.5 0-2.07-.96-3.61-2.25-4.5C14.26 2.34 13.12 2 12 2h-2.5ZM2.5 13a2.5 2.5 0 0 1 2-2.5h15a2.5 2.5 0 0 1 2 2.5c0 .9-.36 1.72-1 2.25-.64.53-1 1.35-1 2.25v.5a2.5 2.5 0 0 1-2.5 2.5h-1a2.5 2.5 0 0 1-2.5-2.5v-.5c0-1.12-.54-2.17-1.5-2.75-.96-.58-1.5-1.63-1.5-2.75v-1.5c0-.9.36 1.72 1-2.25.64-.53-1-1.35-1-2.25v-.5a2.5 2.5 0 0 0-2.5-2.5h-1A2.5 2.5 0 0 0 7 7.5v.5c0 1.12.54 2.17 1.5 2.75.96.58 1.5 1.63 1.5 2.75v1.5"/></svg> },
       { id: PowerMode.PRO2, labelKey: 'powerModePro2', descKey: 'powerModePro2Desc', powerMode: PowerMode.PRO2, specializedMode: 'none' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> },
+      { id: PowerMode.SUPER, labelKey: 'powerModeSuper', descKey: 'powerModeSuperDesc', powerMode: PowerMode.SUPER, specializedMode: 'none' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> },
       { id: 'plus', labelKey: 'specializedModePlus', descKey: 'plusModeDesc', powerMode: PowerMode.PRO2, specializedMode: 'plus' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>, disabled: !canUsePlus() },
+      { id: 'notebook', labelKey: 'specializedModeNotebook', descKey: 'specializedModeNotebook', powerMode: PowerMode.THINK, specializedMode: 'notebook' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> },
+      { id: 'nanobanana', labelKey: 'specializedModeNanoBanana', descKey: 'specializedModeNanoBanana', powerMode: PowerMode.THINK, specializedMode: 'nanobanana' as const, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
     ];
     
-    const currentMode = modeOptions.find(m => m.id === activeModeId);
-    const currentModeIcon = currentMode?.icon;
+    // Explicitly fallback if teacher is active but not in dropdown
+    let currentModeIcon = modeOptions.find(m => m.id === activeModeId)?.icon;
+    if (!currentModeIcon && settings.specializedMode === 'teacher') {
+        currentModeIcon = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 14l9-5-9-5-9 5 9 5z" /><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" /></svg>;
+    } else if (!currentModeIcon) {
+        currentModeIcon = modeOptions[0].icon; // Fallback to THINK
+    }
 
     return (
         <>
         <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
         {isCallScreenOpen && <CallScreen onClose={() => setIsCallScreenOpen(false)} specializedMode={settings.specializedMode} />}
-        <div className="flex flex-col h-screen bg-transparent transition-colors duration-300">
+        <div className="flex flex-col h-[100dvh] bg-transparent transition-colors duration-300">
             {/* Header */}
-            <div className="sticky top-0 z-10 px-4 pt-4 pb-2 bg-transparent">
-                <header className="max-w-4xl mx-auto flex items-center justify-between p-2 pl-4 bg-black/20 backdrop-blur-lg rounded-full">
+            <div className="sticky top-0 z-10 px-2 sm:px-4 pt-2 sm:pt-4 pb-2 bg-transparent">
+                <header className={`max-w-4xl mx-auto flex items-center justify-between p-2 pl-4 ${settings.theme === 'light' ? 'bg-white shadow-md text-black' : 'bg-black/20 text-white'} backdrop-blur-lg rounded-full`}>
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-[--color-accent] flex items-center justify-center font-bold text-white">{user?.name.charAt(0).toUpperCase()}</div>
                         <h1 className="text-xl font-bold">{user?.name}</h1>
                     </div>
                     <div className="flex items-center gap-1">
-                        <button onClick={handleNewChat} className="p-2 rounded-full hover:bg-white/10" title={t('newChat')}>
+                        <button onClick={handleNewChat} className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`} title={t('newChat')}>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                         </button>
-                        <button onClick={onOpenSettings} className="p-2 rounded-full hover:bg-white/10" title={t('openSettings')}>
+                        <button onClick={onOpenSettings} className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`} title={t('openSettings')}>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         </button>
-                        <button onClick={() => setIsHistoryOpen(true)} className="p-2 rounded-full hover:bg-white/10" title={t('historyTitle')}>
+                        <button onClick={() => setIsHistoryOpen(true)} className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`} title={t('historyTitle')}>
                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
                         </button>
                     </div>
@@ -378,7 +405,7 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
             </div>
 
             {/* Message Area */}
-            <main className={`flex-1 overflow-y-auto p-4 flex flex-col ${settings.theme === 'light' ? 'bg-white text-black' : ''}`}>
+            <main className={`flex-1 overflow-y-auto p-2 sm:p-4 flex flex-col ${settings.theme === 'light' ? 'bg-white text-black' : ''}`}>
                 <div className="max-w-4xl mx-auto w-full">
                     {messages.map((msg) => (
                         <ChatMessage key={msg.id} message={msg} onRegenerate={handleRegenerate} user={user} />
@@ -388,7 +415,7 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
             </main>
             
             {/* Input Area */}
-            <footer className="p-4 bg-transparent sticky bottom-0">
+            <footer className="p-2 sm:p-4 bg-transparent sticky bottom-0">
                 <div className="max-w-4xl mx-auto">
                     <div className="relative">
                         {imageFile && (
@@ -402,12 +429,12 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
                                 </div>
                             </div>
                         )}
-                        <div className="relative flex items-center gap-2 p-2 bg-black/20 backdrop-blur-md rounded-full transition-all focus-within:ring-2 focus-within:ring-[--color-accent]">
-                            <div className="flex items-center gap-1 text-white pl-1">
+                        <div className={`relative flex items-center gap-2 p-2 ${settings.theme === 'light' ? 'bg-white shadow-md text-black' : 'bg-black/20 text-white'} backdrop-blur-md rounded-full transition-all focus-within:ring-2 focus-within:ring-[--color-accent]`}>
+                            <div className="flex items-center gap-1 pl-1">
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isLoading}
-                                    className="p-2 rounded-full hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed" title={t('attachFile')}
+                                    className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/20'} disabled:opacity-50 disabled:cursor-not-allowed`} title={t('attachFile')}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
                                 </button>
@@ -415,7 +442,7 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
                                 <button
                                     onClick={() => setIsCallScreenOpen(true)}
                                     disabled={isLoading || !(settings.powerMode === PowerMode.PRO2 && settings.specializedMode === 'none')}
-                                    className="p-2 rounded-full hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed" 
+                                    className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/20'} disabled:opacity-50 disabled:cursor-not-allowed`} 
                                     title={!(settings.powerMode === PowerMode.PRO2 && settings.specializedMode === 'none') ? t('enablePro2ForCall') : t('startCall')}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
@@ -424,27 +451,30 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
                                 <div ref={modeSelectorRef} className="relative">
                                     <button
                                         onClick={() => setIsModeSelectorOpen(prev => !prev)}
-                                        disabled={isLoading || settings.specializedMode === 'teacher' || settings.activeFeature === Feature.IMAGE_GENERATION}
-                                        className="p-2 rounded-full hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        disabled={isLoading}
+                                        className={`p-2 rounded-full ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/20'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                         {currentModeIcon}
                                     </button>
-                                    <div className={`absolute bottom-full mb-2 w-64 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10 p-2 transition-all duration-300 transform ${isModeSelectorOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                                    <div className={`absolute bottom-full mb-2 w-64 ${settings.theme === 'light' ? 'bg-white text-black shadow-xl border-gray-200' : 'bg-black/50 text-white border-white/10'} backdrop-blur-xl rounded-2xl border p-2 transition-all duration-300 transform ${isModeSelectorOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                         {modeOptions.map((mode) => (
                                             <button 
                                                 key={mode.id}
                                                 onClick={() => {
                                                     setSetting('powerMode', mode.powerMode);
                                                     setSetting('specializedMode', mode.specializedMode);
+                                                    if (settings.activeFeature === Feature.IMAGE_GENERATION && mode.specializedMode !== 'nanobanana') {
+                                                        setSetting('activeFeature', Feature.FILE_ANALYSIS);
+                                                    }
                                                     setIsModeSelectorOpen(false);
                                                 }}
                                                 disabled={mode.disabled}
-                                                className={`w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 text-white ${activeModeId === mode.id ? 'bg-white/20' : ''} ${mode.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                className={`w-full text-left flex items-center gap-3 p-2 rounded-lg ${settings.theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/10'} ${activeModeId === mode.id ? (settings.theme === 'light' ? 'bg-gray-100' : 'bg-white/20') : ''} ${mode.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 <span className="text-[--color-accent]">{mode.icon}</span>
                                                 <div>
                                                      <p className="font-semibold text-sm">{t(mode.labelKey as any)}</p>
-                                                     <p className="text-xs text-gray-400">
+                                                     <p className={`text-xs ${settings.theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
                                                         {mode.id === 'plus'
                                                             ? t(mode.descKey as any, { remaining: String(remainingPlusUses) })
                                                             : t(mode.descKey as any)}
@@ -467,7 +497,7 @@ const MainInterface: React.FC<MainInterfaceProps> = ({ onOpenSettings, user }) =
                                 }}
                                 placeholder={t('inputPlaceholder')}
                                 rows={1}
-                                className="flex-1 w-full py-1 bg-transparent text-white resize-none focus:outline-none border-none placeholder:text-gray-300"
+                                className={`flex-1 w-full py-1 bg-transparent resize-none focus:outline-none border-none ${settings.theme === 'light' ? 'text-black placeholder:text-gray-500' : 'text-white placeholder:text-gray-300'}`}
                                 disabled={isLoading}
                                 style={{ maxHeight: '150px' }}
                             />

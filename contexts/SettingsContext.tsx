@@ -17,7 +17,8 @@ export interface Settings {
   accentColor: 'indigo' | 'blue' | 'purple' | 'green' | 'red';
   personality: string;
   language: string;
-  specializedMode: 'none' | 'plus' | 'teacher';
+  specializedMode: 'none' | 'plus' | 'teacher' | 'notebook' | 'nanobanana';
+  privateChat: boolean;
   activeFeature: Feature;
   powerMode: PowerMode;
   pro2Usage: Usage;
@@ -42,6 +43,7 @@ const defaultSettings: Settings = {
   personality: personalities['Default'],
   language: 'en',
   specializedMode: 'none',
+  privateChat: false,
   activeFeature: Feature.FILE_ANALYSIS,
   powerMode: PowerMode.THINK,
   pro2Usage: { count: 0, timestamp: 0 },

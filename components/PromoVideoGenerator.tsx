@@ -69,7 +69,7 @@ const PromoVideoGenerator: React.FC<PromoVideoGeneratorProps> = ({ onClose }) =>
         try {
             // Step 1: Generate Script
             setProgressMessage(t('promoProgressScript'));
-            let ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+            let ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY || 'dummy-key' });
             const scriptPrompt = `Generate a script for a 30-second cinematic promotional video for an AI application called 'ondeep AI'. The app features: image generation, file analysis, advanced reasoning (Ondeep Plus), fast answers (Ondeep Think), and voice calls. The script should be in Arabic. Structure the output as a JSON array of objects, where each object represents a scene and has two keys: 'visual_prompt' (a detailed, cinematic, and visually rich description for a video generation model) and 'voiceover_text' (the narration for that scene). Make the visual prompts dramatic and exciting.`;
 
             const scriptResponse = await ai.models.generateContent({
@@ -115,7 +115,7 @@ const PromoVideoGenerator: React.FC<PromoVideoGeneratorProps> = ({ onClose }) =>
                 setProgressMessage(t('promoProgressScene', { current: String(i + 1), total: String(script.length) }));
                 
                 // Re-initialize to get latest key, crucial for Veo
-                ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+                ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY || 'dummy-key' });
 
                 try {
                     let operation = await ai.models.generateVideos({

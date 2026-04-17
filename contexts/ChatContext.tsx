@@ -1,5 +1,6 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo, ReactNode, useContext } from 'react';
 import { Message, MessageSender } from '../types';
+import { SettingsContext } from './SettingsContext';
 
 const MAX_HISTORY_SIZE = 10;
 const HISTORY_STORAGE_KEY = 'ondeep-ai-chat-history';
@@ -40,6 +41,7 @@ interface ChatProviderProps {
 }
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
+  const { settings } = useContext(SettingsContext);
   const [messages, setMessages] = useState<Message[]>([]);
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [userName, setUserName] = useState<string>('');
@@ -78,6 +80,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, []);
 
   const saveCurrentChat = useCallback(() => {
+    if (settings.privateChat) return;
     if (messages.length === 0 || (messages.length === 1 && messages[0].isWelcomeMessage)) return;
 
     setHistory(prevHistory => {
@@ -105,7 +108,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         saveHistoryToStorage(finalHistory);
         return finalHistory;
     });
-  }, [messages]);
+  }, [messages, settings.privateChat]);
 
   const loadChat = useCallback((id: string) => {
     saveCurrentChat();

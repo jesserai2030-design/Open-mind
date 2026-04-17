@@ -2,11 +2,18 @@ import { GoogleGenAI, GenerateContentResponse, Modality, Content } from "@google
 import { Feature, PowerMode, Message, MessageSender } from '../types';
 import { translations } from '../localization/translations';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
+let aiInstance: GoogleGenAI | null = null;
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("API_KEY or GEMINI_API_KEY environment variable is not set.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
+  }
+  return aiInstance;
+};
 
 const fileToGenerativePart = async (file: File) => {
   const base64EncodedDataPromise = new Promise<string>((resolve) => {
@@ -37,6 +44,8 @@ const getPlusSystemInstruction = (language: keyof typeof translations = 'en'): s
 
 const thinkModeInstruction = `Be concise and provide direct answers without excessive detail. If the user asks for more depth or a more comprehensive answer, suggest they try Ondeep Pro 2 for a more detailed, web-researched response.`;
 
+const notebookSystemInstruction = `You are Notebook LM, an AI model that strictly summarizes and analyzes attached files. You must ONLY answer questions based on the attached files or images. If the user asks a question without attaching any file or image, you MUST politely refuse to answer and ask the user to attach a document first. Do not use external knowledge to answer outside the scope of the attached files.`;
+
 const imageGenerationSystemInstruction = `You are an advanced image generation AI. Your task is to create a high-quality image that accurately and creatively interprets the user's prompt. Analyze the prompt for keywords related to style (e.g., 'photorealistic', 'cartoon', 'fantasy', 'abstract'), subject matter, colors, and composition. Generate either a realistic or an imaginary image as described by the user.`;
 
 const transformHistory = (history: Message[]): Content[] => {
@@ -53,7 +62,7 @@ interface RunGeminiOptions {
   imageFile?: File;
   systemInstruction: string;
   activeFeature: Feature;
-  specializedMode: 'none' | 'plus' | 'teacher';
+  specializedMode: 'none' | 'plus' | 'teacher' | 'notebook' | 'nanobanana';
   powerMode: PowerMode;
   language: keyof typeof translations;
   history: Message[];
@@ -91,7 +100,7 @@ export const runGemini = async ({
 
   // Specialized modes override all other settings
   if (specializedMode === 'plus') {
-      return await ai.models.generateContent({
+      return await getAI().models.generateContent({
           model: 'gemini-2.5-pro',
           contents,
           config: { 
@@ -102,16 +111,24 @@ export const runGemini = async ({
   }
 
   if (specializedMode === 'teacher') {
-      return await ai.models.generateContent({
+      return await getAI().models.generateContent({
           model: 'gemini-2.5-pro',
           contents,
           config: { systemInstruction: teacherSystemInstruction, thinkingConfig: { thinkingBudget: 32768 } },
       });
   }
   
+  if (specializedMode === 'notebook') {
+      return await getAI().models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents,
+          config: { systemInstruction: notebookSystemInstruction },
+      });
+  }
+
   // If an image file is provided, it's already handled in `finalUserContent`.
   if (imageFile) {
-      return await ai.models.generateContent({
+      return await getAI().models.generateContent({
           model: 'gemini-2.5-flash',
           contents,
           config: { systemInstruction },
@@ -119,8 +136,8 @@ export const runGemini = async ({
   }
   
   // Image generation is not conversational and does not use history.
-  if (activeFeature === Feature.IMAGE_GENERATION) {
-      return await ai.models.generateContent({
+  if (activeFeature === Feature.IMAGE_GENERATION || specializedMode === 'nanobanana') {
+      return await getAI().models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: { parts: [{ text: prompt }] },
           config: {
@@ -133,7 +150,7 @@ export const runGemini = async ({
   // If no specific feature matches, it's a text-only chat.
   if (powerMode === PowerMode.PRO2) {
       // Ondeep Pro 2: Detailed, web-searched answers
-      return await ai.models.generateContent({
+      return await getAI().models.generateContent({
         model: 'gemini-2.5-pro',
         contents,
         config: { 
@@ -142,9 +159,19 @@ export const runGemini = async ({
             thinkingConfig: { thinkingBudget: 32768 }
         },
       });
+  } else if (powerMode === PowerMode.SUPER) {
+      // Ondeep Super: Unlimited free models with web search
+      return await getAI().models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents,
+        config: { 
+            tools: [{ googleSearch: {} }],
+            systemInstruction,
+        },
+      });
   } else {
       // Ondeep Think: Quick, logical answers
-      return await ai.models.generateContent({
+      return await getAI().models.generateContent({
         model: 'gemini-2.5-flash',
         contents,
         config: { 

@@ -6,6 +6,7 @@ export enum Feature {
 export enum PowerMode {
   THINK = 'think',
   PRO2 = 'pro2',
+  SUPER = 'super',
 }
 
 export enum MessageSender {
