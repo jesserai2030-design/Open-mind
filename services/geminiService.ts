@@ -6,10 +6,15 @@ let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
   if (!aiInstance) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+    const rawKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.API_KEY) : undefined);
+    
+    // Check if the key is valid (not empty and not the string "undefined" which can happen with Vite define)
+    const apiKey = rawKey && rawKey !== 'undefined' && rawKey !== 'null' ? rawKey : undefined;
+
     if (!apiKey) {
-      console.warn("API_KEY or GEMINI_API_KEY environment variable is not set.");
+      console.warn("API_KEY or GEMINI_API_KEY environment variable is not set. Please set VITE_GEMINI_API_KEY or GEMINI_API_KEY in your environment.");
     }
+    
     aiInstance = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
   }
   return aiInstance;
